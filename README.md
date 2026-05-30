@@ -28,6 +28,7 @@ All deliverables live in [`docs/`](docs):
 | 2 | [Analysis Report](docs/02-analysis-report.md)                     | Full report covering malware classification, attack simulations, and defense effectiveness. |
 | 3 | [Defense Implementation Guide](docs/03-defense-implementation-guide.md) | Step-by-step hardening of the victim VM (iptables, Fail2Ban, Snort, ACLs, system hardening). |
 | 4 | [Presentation Demo Script](docs/04-presentation-demo-script.md)   | Walkthrough script and timing for the group's live demo. |
+| 5 | [Access Attack — Windows 7 Walkthrough](docs/05-access-attack-windows7-walkthrough.md) | Tailored access-attack steps based on the actual Windows 7 victim recon results (EternalBlue, Telnet, RDP, VNC, SMB). |
 
 ## Assignment Coverage
 
